@@ -1,11 +1,9 @@
 import os
 import json
 import torch
-import cv2
 import numpy as np
 import streamlit as st
 from PIL import Image
-from pathlib import Path
 from src.step7_prediction import PlantDiseasePredictor
 
 # Configuration de la page Streamlit
@@ -125,21 +123,24 @@ else:
     with col_right:
         st.subheader("📋 Diagnostic & Résultats")
         if uploaded_file is not None:
-            # Sauvegarder temporairement pour l'analyse
-            temp_path = "temp_upload.jpg"
-            image.save(temp_path)
-
             with st.spinner("🧠 Analyse en cours par le réseau EfficientNet-B3..."):
                 try:
-                    res = predictor.predict(temp_path, top_k=5)
-                    
+                    # Prediction en memoire : pas de fichier temporaire partage entre sessions
+                    res = predictor.predict_array(np.array(image), top_k=5)
+
                     plant = res['plant'].replace('_', ' ')
                     disease = res['disease'].replace('_', ' ')
                     confidence = res['confidence'] * 100
                     is_healthy = res['is_healthy']
 
                     st.markdown("---")
-                    
+
+                    if res.get('is_uncertain'):
+                        st.warning(
+                            "⚠️ Confiance faible : cette image n'est peut-être pas une feuille "
+                            "d'une des espèces connues du modèle. Interprétez le résultat avec prudence."
+                        )
+
                     if is_healthy:
                         st.markdown(f"""
                         <div class="metric-card">
@@ -160,7 +161,7 @@ else:
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.write("📊 **Top-5 des probabilités :**")
-                    
+
                     for item in res['top_k']:
                         class_name = item['class'].replace('___', ' ➔ ').replace('_', ' ')
                         prob = item['probability'] * 100
@@ -169,8 +170,5 @@ else:
 
                 except Exception as e:
                     st.error(f"Erreur lors de l'analyse : {str(e)}")
-                finally:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
         else:
             st.info("👆 Veuillez importer une image dans le panneau de gauche pour voir le diagnostic.")
