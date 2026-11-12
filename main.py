@@ -8,10 +8,19 @@ import os
 import json
 import torch
 import argparse
-import warnings
-warnings.filterwarnings('ignore')
+import random
+import numpy as np
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 def run_pipeline(args):
+    set_seed(args.seed)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"\n[DEVICE] Device utilise : {device}")
 
@@ -57,7 +66,7 @@ def run_pipeline(args):
 
         _, _, test_loader, class_names, num_classes = create_dataloaders(splits_dir=splits_dir, img_size=args.img_size, batch_size=args.batch_size)
         model = build_model(num_classes=num_classes, pretrained=False, device=device)
-        ckpt = torch.load('models/best_model.pth', map_location=device)
+        ckpt = torch.load('models/best_model.pth', map_location=device, weights_only=True)
         model.load_state_dict(ckpt['model_state_dict'])
 
         evaluator = ModelEvaluator(model, test_loader, class_names, device)
@@ -86,5 +95,6 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=7)
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--image', type=str, default=None)
+    parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
     run_pipeline(args)
